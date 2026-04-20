@@ -1,4 +1,4 @@
-import { type User } from "@/lib/auth/auth-context";
+import type { User } from "@/lib/auth/types";
 import { getSession } from "@/lib/auth/session";
 import { AuthProvider } from "@/lib/auth/auth-context";
 

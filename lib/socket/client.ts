@@ -7,9 +7,15 @@ type AuctionSocket = Socket;
 let socket: AuctionSocket | null = null;
 let connectionState: ConnectionState = "disconnected";
 const listeners = new Set<() => void>();
+let pendingRejoin: string | null = null;
 
 function notifyListeners() {
   for (const cb of listeners) cb();
+}
+
+function ensureSocket(): AuctionSocket {
+  if (socket) return socket;
+  throw new Error("Socket not connected. Call connect() first.");
 }
 
 export function onConnectionStateChange(cb: () => void) {
@@ -28,7 +34,11 @@ export function getSocket(): AuctionSocket | null {
 }
 
 export function connect(userId: string, userName: string): AuctionSocket {
-  if (socket?.connected) return socket;
+  if (socket) {
+    if (socket.connected) return socket;
+    socket.disconnect();
+    socket = null;
+  }
 
   socket = io(SOCKET_SERVER_URL, {
     auth: { userId, userName },
@@ -47,9 +57,13 @@ export function connect(userId: string, userName: string): AuctionSocket {
   socket.on("connect", () => {
     connectionState = "connected";
     notifyListeners();
+
+    if (pendingRejoin) {
+      socket!.emit("auction:join", pendingRejoin);
+    }
   });
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", (reason) => {
     connectionState = "disconnected";
     notifyListeners();
   });
@@ -69,95 +83,81 @@ export function connect(userId: string, userName: string): AuctionSocket {
 
 export function disconnect() {
   if (!socket) return;
-  socket.removeAllListeners();
-  socket.disconnect();
+  pendingRejoin = null;
+  const s = socket;
   socket = null;
+  s.offAny();
+  s.disconnect();
   connectionState = "disconnected";
   notifyListeners();
 }
 
 export function joinAuction(auctionId: string) {
-  socket?.emit("auction:join", auctionId);
+  pendingRejoin = auctionId;
+  ensureSocket().emit("auction:join", auctionId);
 }
 
 export function leaveAuction(auctionId: string) {
-  socket?.emit("auction:leave", auctionId);
+  pendingRejoin = null;
+  if (socket) socket.emit("auction:leave", auctionId);
 }
 
-export function placeBid(auctionId: string, amount: number) {
-  socket?.emit("auction:bid", { auctionId, amount });
+export function placeBid(
+  auctionId: string,
+  amount: number,
+  ack?: (response: { success: boolean; error?: string }) => void
+) {
+  ensureSocket().emit("auction:bid", { auctionId, amount }, ack);
 }
 
 export function requestBidHistory(auctionId: string) {
-  socket?.emit("auction:get-history", auctionId);
+  ensureSocket().emit("auction:get-history", auctionId);
+}
+
+function registerListener<T>(event: string, cb: (data: T) => void) {
+  const s = ensureSocket();
+  s.on(event, cb);
+  return () => {
+    s.off(event, cb);
+  };
 }
 
 export function onNewBid(cb: (bid: Bid) => void) {
-  socket?.on("auction:bid:new", cb);
-  return () => {
-    socket?.off("auction:bid:new", cb);
-  };
+  return registerListener("auction:bid:new", cb);
 }
 
 export function onBidAccepted(cb: (bid: Bid) => void) {
-  socket?.on("auction:bid:accepted", cb);
-  return () => {
-    socket?.off("auction:bid:accepted", cb);
-  };
+  return registerListener("auction:bid:accepted", cb);
 }
 
 export function onBidRejected(cb: (reason: string) => void) {
-  socket?.on("auction:bid:rejected", cb);
-  return () => {
-    socket?.off("auction:bid:rejected", cb);
-  };
+  return registerListener("auction:bid:rejected", cb);
 }
 
 export function onAuctionUpdated(cb: (auction: AuctionItem) => void) {
-  socket?.on("auction:updated", cb);
-  return () => {
-    socket?.off("auction:updated", cb);
-  };
+  return registerListener("auction:updated", cb);
 }
 
 export function onAuctionEnded(cb: (auction: AuctionItem) => void) {
-  socket?.on("auction:ended", cb);
-  return () => {
-    socket?.off("auction:ended", cb);
-  };
+  return registerListener("auction:ended", cb);
 }
 
 export function onTimeLeft(cb: (data: { auctionId: string; timeLeft: number }) => void) {
-  socket?.on("auction:time-left", cb);
-  return () => {
-    socket?.off("auction:time-left", cb);
-  };
+  return registerListener("auction:time-left", cb);
 }
 
 export function onParticipants(cb: (data: { auctionId: string; count: number }) => void) {
-  socket?.on("auction:participants", cb);
-  return () => {
-    socket?.off("auction:participants", cb);
-  };
+  return registerListener("auction:participants", cb);
 }
 
 export function onOutbid(cb: (data: { auctionId: string; newHighestBid: number; bidderName: string }) => void) {
-  socket?.on("auction:outbid", cb);
-  return () => {
-    socket?.off("auction:outbid", cb);
-  };
+  return registerListener("auction:outbid", cb);
 }
 
 export function onError(cb: (message: string) => void) {
-  socket?.on("auction:error", cb);
-  return () => {
-    socket?.off("auction:error", cb);
-  };
+  return registerListener("auction:error", cb);
 }
 
 export function onBidHistory(cb: (bids: Bid[]) => void) {
-  socket?.on("auction:history", cb);
-  return () => {
-    socket?.off("auction:history", cb);
-  };
+  return registerListener("auction:history", cb);
 }

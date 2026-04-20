@@ -1,13 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string;
-}
+import { createContext, useContext, useState, type ReactNode } from "react";
+import type { User } from "./types";
 
 interface AuthContextValue {
   user: User | null;

@@ -9,7 +9,7 @@ import {
   ServerToClientEvents,
   SocketData,
 } from "./types";
-import { registerAuctionHandlers, startAuctionTimers } from "./auction/handler";
+import { registerAuctionHandlers, scheduleAuctionTimers } from "./auction/handler";
 import * as store from "./auction/store";
 
 const PORT = parseInt(process.env.SOCKET_PORT ?? "3001", 10);
@@ -76,7 +76,7 @@ io.on("connection", (socket) => {
 });
 
 store.seedAuctions();
-startAuctionTimers(io);
+scheduleAuctionTimers(io);
 
 httpServer.listen(PORT, () => {
   console.log(`[server] Auction socket server running on http://localhost:${PORT}`);

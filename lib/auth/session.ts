@@ -1,15 +1,9 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import type { User } from "./types";
 
 const SESSION_COOKIE = "auction_session";
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string;
-}
 
 const AVATAR_COLORS = [
   "bg-blue-600",

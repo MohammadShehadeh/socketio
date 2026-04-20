@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   joinAuction,
   leaveAuction,
+  placeBid,
   onAuctionUpdated,
   onBidHistory,
   onNewBid,
@@ -15,7 +16,7 @@ import {
   onOutbid,
   onError,
 } from "@/lib/socket/client";
-import type { AuctionItem, Bid, AuctionState, ConnectionState } from "@/lib/socket/types";
+import type { AuctionState } from "@/lib/socket/types";
 
 const initialState: AuctionState = {
   auction: null,
@@ -56,10 +57,10 @@ export function useAuction(auctionId: string | null) {
       }),
       onNewBid((bid) => {
         if (mountedRef.current) {
-          setState((prev) => ({
-            ...prev,
-            bids: [...prev.bids, bid],
-          }));
+          setState((prev) => {
+            if (prev.bids.some((b) => b.id === bid.id)) return prev;
+            return { ...prev, bids: [...prev.bids, bid] };
+          });
         }
       }),
       onParticipants(({ count }) => {
@@ -119,8 +120,10 @@ export function useAuction(auctionId: string | null) {
     (amount: number) => {
       if (!auctionId) return;
       setState((prev) => ({ ...prev, lastError: null }));
-      import("@/lib/socket/client").then(({ placeBid }) => {
-        placeBid(auctionId, amount);
+      placeBid(auctionId, amount, (response) => {
+        if (!response.success && mountedRef.current) {
+          setState((prev) => ({ ...prev, lastError: response.error ?? "Bid failed" }));
+        }
       });
     },
     [auctionId]

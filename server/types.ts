@@ -27,6 +27,11 @@ export interface AuctionRoom {
   participants: Set<string>;
 }
 
+export interface BidAck {
+  success: boolean;
+  error?: string;
+}
+
 export interface ServerToClientEvents {
   "auction:bid:new": (bid: Bid) => void;
   "auction:bid:accepted": (bid: Bid) => void;
@@ -44,7 +49,7 @@ export interface ServerToClientEvents {
 export interface ClientToServerEvents {
   "auction:join": (auctionId: string) => void;
   "auction:leave": (auctionId: string) => void;
-  "auction:bid": (data: { auctionId: string; amount: number }) => void;
+  "auction:bid": (data: { auctionId: string; amount: number }, ack?: (response: BidAck) => void) => void;
   "auction:get-history": (auctionId: string) => void;
 }
 
