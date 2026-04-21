@@ -82,9 +82,12 @@ export function useAuction(auctionId: string | null) {
           }));
         }
       }),
-      onBidAccepted(() => {
+      onBidAccepted((bid) => {
         if (mountedRef.current) {
-          setState((prev) => ({ ...prev, lastError: null }));
+          setState((prev) => {
+            if (prev.bids.some((b) => b.id === bid.id)) return prev;
+            return { ...prev, lastError: null, bids: [...prev.bids, bid] };
+          });
         }
       }),
       onBidRejected((reason) => {

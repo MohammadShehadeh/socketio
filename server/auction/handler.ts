@@ -74,7 +74,7 @@ export function registerAuctionHandlers(io: TypedServer, socket: TypedSocket) {
 
 		socket.emit('auction:bid:accepted', bid);
 
-		socket.to(`auction:${auctionId}`).emit('auction:bid:new', bid);
+		io.to(`auction:${auctionId}`).emit('auction:bid:new', bid);
 
 		const auction = store.getAuction(auctionId)!;
 		io.to(`auction:${auctionId}`).emit('auction:updated', auction);
