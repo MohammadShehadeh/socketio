@@ -63,7 +63,7 @@ export function connect(userId: string, userName: string): AuctionSocket {
     }
   });
 
-  socket.on("disconnect", (reason) => {
+  socket.on("disconnect", () => {
     connectionState = "disconnected";
     notifyListeners();
   });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import {
   connect,
   disconnect,
@@ -9,25 +9,23 @@ import {
 } from "@/lib/socket/client";
 import type { ConnectionState } from "@/lib/socket/types";
 
+const SERVER_STATE: ConnectionState = "disconnected";
+function subscribe(notify: () => void) {
+  return onConnectionStateChange(notify);
+}
+function getSnapshot(): ConnectionState {
+  return getConnectionState();
+}
+function getServerSnapshot(): ConnectionState {
+  return SERVER_STATE;
+}
+
 export function useSocketConnection(userId: string, userName: string) {
-  const [state, setState] = useState<ConnectionState>("disconnected");
-  const mountedRef = useRef(true);
+  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   useEffect(() => {
-    mountedRef.current = true;
-    setState(getConnectionState());
-
-    const unsubscribe = onConnectionStateChange(() => {
-      if (mountedRef.current) {
-        setState(getConnectionState());
-      }
-    });
-
     connect(userId, userName);
-
     return () => {
-      mountedRef.current = false;
-      unsubscribe();
       disconnect();
     };
   }, [userId, userName]);

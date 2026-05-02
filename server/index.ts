@@ -1,7 +1,7 @@
 
 import express from "express";
 import { createServer } from "http";
-import { Server } from "socket.io";
+import { Server, type Namespace } from "socket.io";
 import cors from "cors";
 import {
   ClientToServerEvents,
@@ -11,6 +11,15 @@ import {
 } from "./types";
 import { registerAuctionHandlers, scheduleAuctionTimers } from "./auction/handler";
 import * as store from "./auction/store";
+import {
+  registerPlaygroundHandlers,
+  startPlaygroundTick,
+} from "./playground/handler";
+import type {
+  PlaygroundClientToServer,
+  PlaygroundServerToClient,
+  PlaygroundSocketData,
+} from "./playground/types";
 
 const PORT = parseInt(process.env.SOCKET_PORT ?? "3001", 10);
 const CLIENT_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -75,10 +84,27 @@ io.on("connection", (socket) => {
   });
 });
 
+// ---- /playground namespace --------------------------------------------------
+// Separate namespace so playground demos and auction events never cross-talk.
+// Same TCP connection though — Socket.IO multiplexes namespaces over one
+// underlying transport.
+//
+// io.of() inherits the Server's generic types in this socket.io version, so we
+// cast at the boundary — the handler module enforces its own typed contract.
+const playground = io.of("/playground") as unknown as Namespace<
+  PlaygroundClientToServer,
+  PlaygroundServerToClient,
+  Record<string, never>,
+  PlaygroundSocketData
+>;
+registerPlaygroundHandlers(playground);
+startPlaygroundTick(playground);
+
 store.seedAuctions();
 scheduleAuctionTimers(io);
 
 httpServer.listen(PORT, () => {
   console.log(`[server] Auction socket server running on http://localhost:${PORT}`);
   console.log(`[server] CORS origin: ${CLIENT_URL}`);
+  console.log(`[server] Namespaces: / (auction), /playground`);
 });

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm server:dev)",
+      "Bash(curl -sS http://localhost:3001/health)",
+      "Bash(curl -sS http://localhost:3001/api/auctions)",
+      "Bash(SOCKET_PORT=3050 NEXT_PUBLIC_APP_URL=http://localhost:3000 pnpm server:dev)",
+      "Bash(curl -sS http://localhost:3050/health)",
+      "Bash(curl -sS http://localhost:3050/api/auctions)",
+      "Bash(node e:/tmp/smoke-playground.mjs)",
+      "Bash(cp e:/tmp/smoke-playground.mjs e:/open-source/socketio/smoke-playground.mjs)",
+      "Bash(node smoke-playground.mjs)",
+      "Bash(pnpm next *)",
+      "Bash(SOCKET_PORT=3060 NEXT_PUBLIC_APP_URL=http://localhost:3000 pnpm server:dev)"
+    ]
+  }
+}

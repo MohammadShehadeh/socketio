@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { AuctionItem } from "@/lib/socket/types";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -20,28 +21,55 @@ function formatTime(ms: number): string {
 }
 
 function useCountdown(endTime: number, isActive: boolean) {
-  const [timeLeft, setTimeLeft] = useState(() =>
-    Math.max(0, endTime - Date.now())
-  );
+  // Subscribe to a 1Hz tick. The store lives outside React (a single shared
+  // interval) so multiple cards don't each spin up their own timer, and so
+  // the snapshot computation stays a pure read of Date.now() at tick time.
+  const now = useNowTick(isActive);
+  if (!isActive) return 0;
+  return Math.max(0, endTime - now);
+}
 
-  useEffect(() => {
-    if (!isActive) {
-      setTimeLeft(0);
-      return;
-    }
-
-    setTimeLeft(Math.max(0, endTime - Date.now()));
-
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, endTime - Date.now());
-      setTimeLeft(remaining);
-      if (remaining <= 0) clearInterval(interval);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [endTime, isActive]);
-
-  return timeLeft;
+// External-store tick. We share one interval across all subscribers so a grid
+// of N cards runs N component subscriptions but only one timer.
+const tickListeners = new Set<() => void>();
+let tickInterval: ReturnType<typeof setInterval> | null = null;
+let lastTickAt = 0;
+function startTickIfNeeded() {
+  if (tickInterval) return;
+  lastTickAt = Date.now();
+  tickInterval = setInterval(() => {
+    lastTickAt = Date.now();
+    for (const cb of tickListeners) cb();
+  }, 1000);
+}
+function stopTickIfIdle() {
+  if (tickListeners.size > 0) return;
+  if (tickInterval) {
+    clearInterval(tickInterval);
+    tickInterval = null;
+  }
+}
+function subscribeTick(cb: () => void) {
+  tickListeners.add(cb);
+  startTickIfNeeded();
+  return () => {
+    tickListeners.delete(cb);
+    stopTickIfIdle();
+  };
+}
+function getTickSnapshot() {
+  if (lastTickAt === 0) lastTickAt = Date.now();
+  return lastTickAt;
+}
+function getTickServerSnapshot() {
+  return 0;
+}
+function useNowTick(isActive: boolean) {
+  const subscribe = isActive ? subscribeTick : noopSubscribe;
+  return useSyncExternalStore(subscribe, getTickSnapshot, getTickServerSnapshot);
+}
+function noopSubscribe() {
+  return () => {};
 }
 
 function AuctionCard({ auction }: { auction: AuctionItem }) {
@@ -132,6 +160,23 @@ export default function Home() {
       </header>
 
       <div className="mx-auto w-full max-w-5xl p-6">
+        <Link
+          href="/playground"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 transition-colors hover:bg-violet-100 dark:border-violet-900 dark:bg-violet-950/40 dark:hover:bg-violet-950"
+        >
+          <span className="text-xl">🧪</span>
+          <div className="flex-1">
+            <div className="font-semibold text-violet-900 dark:text-violet-100">
+              Socket.IO Playground
+            </div>
+            <div className="text-sm text-violet-700 dark:text-violet-300">
+              Concept-by-concept demos: handshake, broadcast scopes, rooms, presence,
+              cursors, acks, rate limiting — each with a live event inspector.
+            </div>
+          </div>
+          <span className="text-violet-600 dark:text-violet-300">→</span>
+        </Link>
+
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {auctions.map((auction) => (
             <AuctionCard key={auction.id} auction={auction} />
